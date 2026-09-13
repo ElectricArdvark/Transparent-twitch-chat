@@ -1,37 +1,43 @@
 // ==UserScript==
 // @name         Transparent Twitch Chat
 // @description  Why decide between missing a PogChamp or sacrificing precious screen space, when you can have the best of both worlds!
-// @version      1.5.0
-// @namespace    https://chylex.com
-// @homepageURL  https://github.com/chylex/Transparent-Twitch-Chat
-// @supportURL   https://github.com/chylex/Transparent-Twitch-Chat/issues
-// @downloadURL  https://github.com/chylex/Transparent-Twitch-Chat/raw/master/dist/TransparentTwitchChat.user.js
+// @version      1.6.0
+// @homepageURL  https://github.com/ElectricArdvark/Transparent-twitch-chat
+// @supportURL   https://github.com/ElectricArdvark/Transparent-twitch-chat/issues
+// @downloadURL  https://github.com/ElectricArdvark/Transparent-twitch-chat/raw/master/dist/TransparentTwitchChat.user.js
 // @include      https://www.twitch.tv/*
 // @run-at       document-end
 // @grant        GM_getValue
 // @grant        GM_setValue
+// @grant        GM_registerMenuCommand
+// @grant        GM.registerMenuCommand
 // @noframes
 // ==/UserScript==
 
 const settings = {
   globalSwitch: true,
-  
+
   chatWidth: 350,
   chatFilters: "",
   playerPosition: "center center",
   hideTimestamps: true,
   grayTheme: false,
-  
+
   hideHeader: true,
   hideChatInput: false,
   hidePinnedCheer: false,
   hideConversations: false,
-  
+
+  toggleChatShortcut: false,
+  toggleChatKey: "Alt+C",
+
   transparentChat: true,
   smoothTextShadow: false,
   chatLeftSide: false,
+  hideChatBorder: true,
+  keepTransparentOnHover: false,
   backgroundOpacity: 30,
-  
+
   hideBadgeTurbo: true,
   hideBadgePrime: true,
   hideBadgeSubscriber: true,
@@ -42,26 +48,26 @@ const settings = {
   badgeOpacity: 85
 };
 
-if (typeof GM_getValue !== "undefined"){
-  for(let key in settings){
+if (typeof GM_getValue !== "undefined") {
+  for (let key in settings) {
     settings[key] = GM_getValue(key, settings[key]);
   }
 }
 
 const isFirefox = navigator.userAgent.includes(" Gecko/") || "mozFullScreen" in document;
 
-function tryRemoveElement(ele){
-  if (ele && ele.parentNode){
+function tryRemoveElement(ele) {
+  if (ele && ele.parentNode) {
     ele.parentNode.removeChild(ele);
   }
 }
 
-function onSettingsUpdated(){
+function onSettingsUpdated() {
   generateCustomCSS();
   refreshChatFilters();
-  
-  if (typeof GM_setValue !== "undefined"){
-    for(let key in settings){
+
+  if (typeof GM_setValue !== "undefined") {
+    for (let key in settings) {
       GM_setValue(key, settings[key]);
     }
   }
@@ -69,28 +75,28 @@ function onSettingsUpdated(){
 
 // Styles
 
-function generateCustomCSS(){
-  if (!settings.globalSwitch){
-    tryRemoveElement(document.getElementById("chylex-ttc-style-custom"));
+function generateCustomCSS() {
+  if (!settings.globalSwitch) {
+    tryRemoveElement(document.getElementById("twt-ttc-style-custom"));
     return;
   }
-  
+
   const wa = ":not(.ttcwa)"; // selector priority workaround
-  const rcol = ".right-column--theatre";
-  const rcolBlur = ".right-column--theatre:not(:hover)";
-  const isTheatre = ".ttc-theatre";
+  const rcol = ":is(.right-column--theatre, .right-column--fullscreen)";
+  const rcolBlur = ":is(.right-column--theatre, .right-column--fullscreen):not(:hover)";
+  const rcolTrans = settings.keepTransparentOnHover ? rcol : rcolBlur;
+  const isTheatre = ":is(.ttc-theatre, .ttc-player-fullscreen)";
   const fullWidth = ".ttc-rcol-collapsed";
-  const fullScreen = ".ttc-player-fullscreen";
-  
+
   const isChatLeft = settings.chatLeftSide && settings.transparentChat;
-  
-  let style = document.getElementById("chylex-ttc-style-custom");
-  
-  if (!style){
+
+  let style = document.getElementById("twt-ttc-style-custom");
+
+  if (!style) {
     style = document.createElement("style");
-    style.id = "chylex-ttc-style-custom";
+    style.id = "twt-ttc-style-custom";
   }
-  
+
   style.innerHTML = `
 ${rcolBlur} .chat-list__lines .simplebar-track.vertical {visibility:hidden!important}
 ${isTheatre} .side-nav {display:none!important}
@@ -115,8 +121,8 @@ ${settings.hideTimestamps ? `
 ${rcol} .vod-message__header div[class*="ScAttachedTooltipWrapper-"] {display:none!important}
 ` : ``}
 ${settings.hideHeader ? `
-${rcolBlur} .stream-chat-header {display:none!important}
-${rcolBlur}:not(.right-column--collapsed) .right-column__toggle-visibility {display:none!important}
+${rcolTrans} .stream-chat-header {display:none!important}
+${rcolTrans}:not(.right-column--collapsed) .right-column__toggle-visibility {display:none!important}
 ` : ``}
 ${settings.hideChatInput ? `
 ${rcolBlur} .chat-input {display:none!important}
@@ -124,23 +130,27 @@ ${rcolBlur} .chat-input {display:none!important}
 ${settings.hidePinnedCheer ? `
 .channel-leaderboard {display:none}
 ` : ``}
+.channel-root, .channel-root__scroll-area--theatre-mode {background:transparent!important;background-color:transparent!important}
 ${settings.transparentChat ? `
-body:not(${fullScreen}) .persistent-player--theatre {width:100%!important}
-body:not(${fullWidth}):not(${fullScreen}) .persistent-player--theatre .top-bar,body:not(${fullWidth}):not(${fullScreen}) .persistent-player--theatre div[data-a-target="player-controls"] {padding-right:${settings.chatWidth}px}
-body:not(${fullWidth}):not(${fullScreen}) .persistent-player--theatre .player-overlay-background > div {right:${settings.chatWidth}px!important}
-${rcolBlur} .channel-root__right-column${wa} {background:rgba(14, 12, 19, ${settings.backgroundOpacity * 0.01})!important}
-${rcolBlur} .channel-root__right-column${wa} > div, ${rcol} .chat-room {background:transparent!important}
-${rcolBlur} .chylex-ttc-chat-container {color:#ece8f3!important}
-${rcolBlur} .rooms-header, ${rcolBlur} .leaderboard-header-tabbed-layout {background:transparent!important}
-${rcolBlur} .chat-input {opacity:0.6}
-${rcolBlur} .chylex-ttc-chat-container {${settings.smoothTextShadow ? `text-shadow:0 0 2px rgba(0,0,0,0.86328125), -1px 0 1px rgba(0,0,0,0.3984375), 0 -1px 1px rgba(0,0,0,0.3984375), 1px 0 1px rgba(0,0,0,0.3984375), 0 1px 1px rgba(0,0,0,0.3984375);` : `text-shadow:-1px 0 0 rgba(0,0,0,0.6640625), 0 -1px 0 rgba(0,0,0,0.6640625), 1px 0 0 rgba(0,0,0,0.6640625), 0 1px 0 rgba(0,0,0,0.6640625);`}}${rcolBlur} .chat-author__display-name, ${rcolBlur} .vod-message__timestamp {${settings.smoothTextShadow ? `text-shadow:-1px 0 1px rgba(0,0,0,0.3984375), 0 -1px 1px rgba(0,0,0,0.3984375), 1px 0 1px rgba(0,0,0,0.3984375), 0 1px 1px rgba(0,0,0,0.3984375);` : `text-shadow:-1px 0 0 rgba(0,0,0,0.53125), 0 -1px 0 rgba(0,0,0,0.53125), 1px 0 0 rgba(0,0,0,0.53125), 0 1px 0 rgba(0,0,0,0.53125);`}}${rcolBlur} .chat-line__message--mention-recipient {text-shadow:none}
-${rcolBlur} .chat-line__message a {color:#cdb9f5!important}
-${rcolBlur} .user-notice-line {background-color:rgba(31, 31, 35, 0.45)!important}
-${rcolBlur} .user-notice-line--highlighted {border-left-color:transparent!important}
-.whispers--theatre-mode .whispers-threads-box__container:not(.whispers-threads-box__container--open):not(:hover) {opacity:${Math.max(0.1, settings.backgroundOpacity * 0.01)}}
+.persistent-player--theatre {width:100%!important}
+body:not(${fullWidth}) .persistent-player--theatre .top-bar,body:not(${fullWidth}) .persistent-player--theatre div[data-a-target="player-controls"] {padding-right:${settings.chatWidth}px}
+body:not(${fullWidth}) .persistent-player--theatre .player-overlay-background > div {right:${settings.chatWidth}px!important}
+${settings.hideChatBorder ? `
+${rcol}${wa}, ${rcol} .channel-root__right-column${wa}, ${rcol} .channel-root__right-column${wa} > div, ${rcol} .chat-room, ${rcol} .chat-shell, ${rcol} .stream-chat, ${rcol} .video-chat, ${rcol} .twt-ttc-chat-container, ${rcol} [data-test-selector="chat-room-component-layout"], ${rcol} [data-a-target="chat-room-component"] {border-left:none!important;border-left-width:0!important;border-left-color:transparent!important;outline:none!important;box-shadow:none!important}
+` : ``}
+${rcol}, ${rcol} > div, ${rcol} aside, ${rcolTrans} .channel-root__right-column${wa} > div, ${rcol} .chat-room, ${rcol} .chat-shell, ${rcol} .stream-chat, ${rcol} .celebration__overlay, ${rcol} .chat-room__content, [data-a-target="right-column-chat-bar"], [data-a-target="right-column-chat-bar"] > div {background:transparent!important}
+${rcolTrans} .channel-root__right-column${wa} {background:rgba(14, 12, 19, ${settings.backgroundOpacity * 0.01})!important}
+${rcolTrans} .twt-ttc-chat-container {color:#ece8f3!important}
+${rcolTrans} .rooms-header, ${rcolTrans} .leaderboard-header-tabbed-layout, ${rcolTrans} .stream-chat-header {background:transparent!important}
+${rcolTrans} .chat-input {opacity:0.6}
+${rcolTrans} .twt-ttc-chat-container {${settings.smoothTextShadow ? `text-shadow:0 0 2px rgba(0,0,0,0.86328125), -1px 0 1px rgba(0,0,0,0.3984375), 0 -1px 1px rgba(0,0,0,0.3984375), 1px 0 1px rgba(0,0,0,0.3984375), 0 1px 1px rgba(0,0,0,0.3984375);` : `text-shadow:-1px 0 0 rgba(0,0,0,0.6640625), 0 -1px 0 rgba(0,0,0,0.6640625), 1px 0 0 rgba(0,0,0,0.6640625), 0 1px 0 rgba(0,0,0,0.6640625);`}}${rcolTrans} .chat-author__display-name, ${rcolTrans} .vod-message__timestamp {${settings.smoothTextShadow ? `text-shadow:-1px 0 1px rgba(0,0,0,0.3984375), 0 -1px 1px rgba(0,0,0,0.3984375), 1px 0 1px rgba(0,0,0,0.3984375), 0 1px 1px rgba(0,0,0,0.3984375);` : `text-shadow:-1px 0 0 rgba(0,0,0,0.53125), 0 -1px 0 rgba(0,0,0,0.53125), 1px 0 0 rgba(0,0,0,0.53125), 0 1px 0 rgba(0,0,0,0.53125);`}}${rcolTrans} .chat-line__message--mention-recipient {text-shadow:none}
+${rcolTrans} .chat-line__message a {color:#cdb9f5!important}
+${rcolTrans} .user-notice-line {background-color:rgba(31, 31, 35, 0.45)!important}
+${rcolTrans} .user-notice-line--highlighted {border-left-color:transparent!important}
+.whispers--theatre-mode .whispers-threads-box__container:not(.whispers-threads-box__container--open)${settings.keepTransparentOnHover ? "" : ":not(:hover)"} {opacity:${Math.max(0.1, settings.backgroundOpacity * 0.01)}}
 ` : `
-body:not(${fullWidth}):not(${fullScreen}) .persistent-player--theatre {width:calc(100% - ${settings.chatWidth}px)!important}
-body:not(${fullScreen}) .persistent-player--theatre .player-streamstatus {margin-right:20px!important}
+body:not(${fullWidth}) .persistent-player--theatre {width:calc(100% - ${settings.chatWidth}px)!important}
+.persistent-player--theatre .player-streamstatus {margin-right:20px!important}
 `}
 .whispers--theatre-mode.whispers--right-column-expanded-beside {
 right: ${settings.chatWidth}px !important;
@@ -150,10 +160,10 @@ ${settings.hideConversations ? `
 .video-player__container--theatre-whispers, .highwind-video-player__container--theatre-whispers {bottom:1px!important; // allows hiding player controls in fullscreen by moving cursor all the way down}` : ``}
 ${isChatLeft ? `
 ${rcol}${wa}, ${rcol} .chat-list__lines .simplebar-track.vertical {left:0!important;right:auto!important}
-${rcol} .channel-root__right-column${wa} > div {border-left:none!important;border-right:var(--border-width-default) solid var(--color-border-base)!important}
-body:not(${fullWidth}):not(${fullScreen}) .persistent-player--theatre .top-bar {padding-left:${settings.chatWidth + 10}px;padding-right:0}
-body:not(${fullWidth}):not(${fullScreen}) .persistent-player--theatre div[data-a-target="player-controls"] {padding-left:${settings.chatWidth}px;padding-right:0}
-body:not(${fullWidth}):not(${fullScreen}) .persistent-player--theatre .player-overlay-background > div {left:${settings.chatWidth}px!important;right:0!important}
+${rcol} .channel-root__right-column${wa} > div {border-left:none!important;${settings.hideChatBorder ? `border-right:none!important;` : `border-right:var(--border-width-default) solid var(--color-border-base)!important;`}}
+body:not(${fullWidth}) .persistent-player--theatre .top-bar {padding-left:${settings.chatWidth + 10}px;padding-right:0}
+body:not(${fullWidth}) .persistent-player--theatre div[data-a-target="player-controls"] {padding-left:${settings.chatWidth}px;padding-right:0}
+body:not(${fullWidth}) .persistent-player--theatre .player-overlay-background > div {left:${settings.chatWidth}px!important;right:0!important}
 .whispers--theatre-mode.whispers--right-column-expanded-beside {right:0px!important}
 ${rcol} .right-column__toggle-visibility {transform:rotate(180deg)!important}
 ${rcol}.right-column--collapsed .right-column__toggle-visibility {left:0.5rem}
@@ -165,7 +175,7 @@ ${rcol} [data-a-target="chat-send-button"] {background-color:#2b2b2b!important;b
 ${rcol} [data-a-target="chat-send-button"]:active, ${rcol} [data-a-target="chat-send-button"]:focus {box-shadow:0 0 6px 0 #787878!important}
 ` : ``}
 
-${rcolBlur} a[data-a-target="chat-badge"] {opacity:${settings.badgeOpacity / 100};${settings.badgeOpacity === 0 ? `display:none!important;` : ``}}
+${rcolTrans} a[data-a-target="chat-badge"] {opacity:${settings.badgeOpacity / 100};${settings.badgeOpacity === 0 ? `display:none!important;` : ``}}
 ${settings.hideBadgeTurbo ? `
 ${rcol} .chat-badge[alt="Turbo"] {display:none}
 ` : ``}
@@ -188,166 +198,172 @@ ${settings.hideBadgeLeader ? `
 ${rcol} .chat-badge[alt*="Bits Leader"], ${rcol} .chat-badge[alt*="Gifter Leader"] {display:none}
 ` : ``}
 
-#chylex-ttc-settings-btn {margin-left:${settings.chatWidth - 50}px}
+#twt-ttc-settings-btn {margin-left:${settings.chatWidth - 50}px}
 `;
-  
+
   document.head.appendChild(style);
 }
 
-function generateSettingsCSS(){
-  if (document.getElementById("chylex-ttc-style-settings")){
+function generateSettingsCSS() {
+  if (document.getElementById("twt-ttc-style-settings")) {
     return;
   }
-  
+
   const style = document.createElement("style");
-  style.id = "chylex-ttc-style-settings";
+  style.id = "twt-ttc-style-settings";
   style.innerHTML = `
-#chylex-ttc-settings-btn {display:none;width:2.5em;height:2.5em;position:absolute;bottom:105px;margin-left:290px;z-index:9;cursor:pointer;fill:rgba(255,255,255,0.6640625)}
-.video-chat #chylex-ttc-settings-btn {bottom:18px}
-#chylex-ttc-settings-btn svg {width:100%;height:100%}
-#chylex-ttc-settings-btn:hover {fill:#fff}
-.right-column--theatre:hover #chylex-ttc-settings-btn {display:block}
-#chylex-ttc-settings-modal {position:absolute;left:50%;top:50%;width:890px;height:296px;margin-left:-445px;margin-top:-148px;z-index:10000;background-color:rgba(17,17,17,0.796875)}
-#chylex-ttc-settings-modal-header {display:flex;justify-content:center;gap:12px;padding:14px 0 13px;background-color:rgba(0,0,0,0.59765625)}
-#chylex-ttc-settings-modal-header input {flex:0 0 auto}
-#chylex-ttc-settings-modal-header h2 {flex:0 0 auto;color:rgba(255,255,255,0.9296875);font-size:24px;margin:0}
-#chylex-ttc-settings-modal .ttc-flex-container {display:flex;flex-direction:row;justify-content:space-between;padding:8px 4px}
-#chylex-ttc-settings-modal p {color:rgba(255,255,255,0.86328125);font-size:14px;margin-top:8px;padding:0 9px}
-#chylex-ttc-settings-modal p:first-of-type {margin:0 0 4px}
-#chylex-ttc-settings-modal .player-menu__section {padding:0 12px 2px}
-#chylex-ttc-settings-modal .player-menu__header {margin-bottom:0;color:rgba(255,255,255,0.6640625)}
-#chylex-ttc-settings-modal .player-menu__item {display:flex;align-items:center;margin:2px 0 9px;padding-left:1px}
-#chylex-ttc-settings-modal .player-menu__item.ttc-setting-small-margin {margin-bottom:7px}
-#chylex-ttc-settings-modal .switch {font-size:10px;height:17px;line-height:17px}
-#chylex-ttc-settings-modal .switch span {width:27px}
-#chylex-ttc-settings-modal .switch.active span {left:25px}
-#chylex-ttc-settings-modal .switch::before, #chylex-ttc-settings-modal .switch::after {width:26px;box-sizing:border-box}
-#chylex-ttc-settings-modal .switch::before {text-align:left;padding-left:5px}
-#chylex-ttc-settings-modal .switch::after {text-align:right;padding-right:3px}
-#chylex-ttc-settings-modal input[type="text"] {width:100%;padding:1px 4px}
-#chylex-ttc-settings-modal input[type="range"] {width:100%}
-#chylex-ttc-settings-modal select {width:100%;padding:1px 0}
-#chylex-ttc-settings-modal output {color:rgba(255,255,255,0.796875);display:inline-block;flex:0 0 auto;padding-left:5px;text-align:right}
-#chylex-ttc-settings-modal .editable:hover {cursor:pointer;text-decoration:underline}
+#twt-ttc-settings-btn {display:none;width:2.5em;height:2.5em;position:absolute;bottom:105px;margin-left:290px;z-index:9;cursor:pointer;fill:rgba(255,255,255,0.6640625)}
+.video-chat #twt-ttc-settings-btn {bottom:18px}
+#twt-ttc-settings-btn svg {width:100%;height:100%}
+#twt-ttc-settings-btn:hover {fill:#fff}
+:is(.right-column--theatre, .right-column--fullscreen):hover #twt-ttc-settings-btn {display:block}
+#twt-ttc-settings-modal {position:fixed;left:50%;top:50%;width:890px;height:auto;min-height:296px;transform:translate(-50%,-50%);z-index:10000;background-color:rgba(17,17,17,0.796875);padding-bottom:10px}
+#twt-ttc-settings-modal-header {position:relative;display:flex;justify-content:center;gap:12px;padding:14px 0 13px;background-color:rgba(0,0,0,0.59765625)}
+#twt-ttc-settings-modal-header input {flex:0 0 auto}
+#twt-ttc-settings-modal-header h2 {flex:0 0 auto;color:rgba(255,255,255,0.9296875);font-size:24px;margin:0}
+#twt-ttc-settings-modal-close {position:absolute;right:14px;top:14px;background:none;border:none;color:rgba(255,255,255,0.6640625);font-size:18px;line-height:1;cursor:pointer;padding:2px 6px}
+#twt-ttc-settings-modal-close:hover {color:#fff}
+#twt-ttc-settings-modal .ttc-flex-container {display:flex;flex-direction:row;justify-content:space-between;padding:8px 4px}
+#twt-ttc-settings-modal p {color:rgba(255,255,255,0.86328125);font-size:14px;margin-top:8px;padding:0 9px}
+#twt-ttc-settings-modal p:first-of-type {margin:0 0 4px}
+#twt-ttc-settings-modal .player-menu__section {padding:0 12px 2px}
+#twt-ttc-settings-modal .player-menu__header {margin-bottom:0;color:rgba(255,255,255,0.6640625)}
+#twt-ttc-settings-modal .player-menu__item {display:flex;align-items:center;margin:2px 0 9px;padding-left:1px}
+#twt-ttc-settings-modal .player-menu__item.ttc-setting-small-margin {margin-bottom:7px}
+#twt-ttc-settings-modal .switch {font-size:10px;height:17px;line-height:17px}
+#twt-ttc-settings-modal .switch span {width:27px}
+#twt-ttc-settings-modal .switch.active span {left:25px}
+#twt-ttc-settings-modal .switch::before, #twt-ttc-settings-modal .switch::after {width:26px;box-sizing:border-box}
+#twt-ttc-settings-modal .switch::before {text-align:left;padding-left:5px}
+#twt-ttc-settings-modal .switch::after {text-align:right;padding-right:3px}
+#twt-ttc-settings-modal input[type="text"] {width:100%;padding:1px 4px}
+#twt-ttc-settings-modal input[type="range"] {width:100%}
+#twt-ttc-settings-modal select {width:100%;padding:1px 0}
+#twt-ttc-settings-modal output {color:rgba(255,255,255,0.796875);display:inline-block;flex:0 0 auto;padding-left:5px;text-align:right}
+#twt-ttc-settings-modal .editable:hover {cursor:pointer;text-decoration:underline}
 `;
-  
+
   document.head.appendChild(style);
 }
 
 // Filters
 
-function getNodeText(node){
-  if (node.nodeType === Node.TEXT_NODE){
+function getNodeText(node) {
+  if (node.nodeType === Node.TEXT_NODE) {
     return node.nodeValue;
   }
-  
-  if (node.nodeType === Node.ELEMENT_NODE){
-    if (node.tagName === "IMG"){
+
+  if (node.nodeType === Node.ELEMENT_NODE) {
+    if (node.tagName === "IMG") {
       return node.getAttribute("alt") || "";
     }
-    else{
+    else {
       let text = "";
-      
-      for(let child of node.childNodes){
+
+      for (let child of node.childNodes) {
         text += getNodeText(child);
       }
-      
+
       return text;
     }
   }
-  
+
   return "";
 }
 
 var filtersRegex = null;
 
-var filtersObserver = new MutationObserver(function(mutations){
-  for(let mutation of mutations){
-    for(let added of mutation.addedNodes){
+var filtersObserver = new MutationObserver(function (mutations) {
+  for (let mutation of mutations) {
+    for (let added of mutation.addedNodes) {
       let text;
       const classes = added.classList;
-      
-      if (classes.contains("chat-line__message")){
+
+      if (classes.contains("chat-line__message")) {
         const nodes = Array.from(added.childNodes);
         const colon = nodes.findIndex(node => node.tagName === "SPAN" && node.innerText === ": ");
-        text = nodes.slice(colon+1).map(getNodeText).join("");
+        text = nodes.slice(colon + 1).map(getNodeText).join("");
       }
-      else{
+      else {
         text = getNodeText(added.querySelector(".qa-mod-message") || added);
       }
-      
-      if (filtersRegex.test(text)){
+
+      if (filtersRegex.test(text)) {
         classes.add("hidden");
       }
     }
   }
 });
 
-function refreshChatFilters(){
+function refreshChatFilters() {
   const chat = document.querySelector(".chat-scrollable-area__message-container, .video-chat__message-list-wrapper ul");
-  
-  if (!chat){
+
+  if (!chat) {
     return false;
   }
-  
+
   const filters = (settings.chatFilters || "").split(",").map(entry => entry.trim()).filter(entry => !!entry);
-  
-  if (filters.length === 0){
+
+  if (filters.length === 0) {
     filtersRegex = null;
   }
-  else{
+  else {
     const options = filters.map(entry => entry.replace(/[.+?^${}()|[\]\\]/g, "\\$&").replace(/\*/g, "(?:\\S*)").replace(/\s+/g, "\\s+")).join("|");
-    filtersRegex = new RegExp("(?:^|[^a-z0-9])(?:"+options+")(?:$|[^a-z0-9])", "i");
+    filtersRegex = new RegExp("(?:^|[^a-z0-9])(?:" + options + ")(?:$|[^a-z0-9])", "i");
   }
-  
-  if (filtersRegex && settings.globalSwitch){
+
+  if (filtersRegex && settings.globalSwitch) {
     filtersObserver.observe(chat, { childList: true });
   }
-  else{
+  else {
     filtersObserver.disconnect();
   }
-  
+
   return true;
 }
 
 // Helpers
 
-var classObserverCallback = function(mutations){
-  for(let mutation of mutations){
+var classObserverCallback = function (mutations) {
+  for (let mutation of mutations) {
     const classes = mutation.target.classList;
-    
-    if (classes.contains("right-column")){
-      document.body.classList.toggle("ttc-theatre", classes.contains("right-column--theatre"));
+
+    if (classes.contains("right-column")) {
+      document.body.classList.toggle("ttc-theatre", classes.contains("right-column--theatre") || classes.contains("right-column--fullscreen"));
       document.body.classList.toggle("ttc-rcol-collapsed", classes.contains("right-column--collapsed"));
+      insertSettingsButton();
     }
   }
 };
 
 var classObserver = new MutationObserver(classObserverCallback);
 
-function setupClassHelpers(){
+function setupClassHelpers() {
   const col = document.querySelector(".right-column");
-  
-  if (!col){
+
+  if (!col) {
     return false;
   }
-  
-  classObserver.observe(col, { attributes: true, attributeFilter: [ "class" ] });
-  
+
+  classObserver.disconnect();
+  classObserver.observe(col, { attributes: true, attributeFilter: ["class"] });
+
   classObserverCallback([
     { target: col }
   ]);
-  
+
   return true;
 }
 
-function setupFullscreenHelper(){
-  for(let event of [ "fullscreenchange", "webkitfullscreenchange", "mozfullscreenchange", "msfullscreenchange" ]){
-    if ("on" + event in document){
-      document.addEventListener(event, function(){
-        document.body.classList.toggle("ttc-player-fullscreen", document.fullscreenElement || document.webkitFullscreenElement || document.mozFullScreenElement || document.msFullscreenElement);
+function setupFullscreenHelper() {
+  for (let event of ["fullscreenchange", "webkitfullscreenchange", "mozfullscreenchange", "msfullscreenchange"]) {
+    if ("on" + event in document) {
+      document.addEventListener(event, function () {
+        document.body.classList.toggle("ttc-player-fullscreen", !!(document.fullscreenElement || document.webkitFullscreenElement || document.mozFullScreenElement || document.msFullscreenElement));
+        setupClassHelpers();
+        insertSettingsButton();
       });
-      
+
       break;
     }
   }
@@ -355,21 +371,22 @@ function setupFullscreenHelper(){
 
 // Settings
 
-function debounce(func, wait){
+function debounce(func, wait) {
   let timeout = -1;
-  
-  return function(){
+
+  return function () {
     window.clearTimeout(timeout);
     timeout = window.setTimeout(func, wait);
   };
 }
 
-function createSettingsModal(){
-  tryRemoveElement(document.getElementById("chylex-ttc-settings-modal"));
-  
-  const generateOptionBase = function(title, item, extra){
+function createSettingsModal() {
+  generateSettingsCSS();
+  tryRemoveElement(document.getElementById("twt-ttc-settings-modal"));
+
+  const generateOptionBase = function (title, item, extra) {
     extra = extra || {};
-    
+
     return `
 <div class="player-menu__section" data-enabled="true"${extra.floatLeft ? ` style="float:left"` : ""}>
   <div class="player-menu__header">
@@ -380,126 +397,131 @@ function createSettingsModal(){
   </div>
 </div>`;
   };
-  
-  const prepareOptionEvent = function(option, setupCallback){
-    window.setTimeout(function(){
+
+  const prepareOptionEvent = function (option, setupCallback) {
+    window.setTimeout(function () {
       const ele = document.getElementById("ttc-opt-" + option);
-      setupCallback(ele);
+      if (ele) {
+        setupCallback(ele);
+      }
     }, 1);
   };
-  
-  const updateOption = function(option, value){
+
+  const updateOption = function (option, value) {
     settings[option] = value;
     onSettingsUpdated();
   };
-  
+
   // Concrete option types
-  
-  const generateToggle = function(title, option, floatLeft){
-    prepareOptionEvent(option, function(ele){
-      ele.addEventListener("click", function(){ updateOption(option, ele.checked); });
+
+  const generateToggle = function (title, option, floatLeft) {
+    prepareOptionEvent(option, function (ele) {
+      ele.addEventListener("click", function () { updateOption(option, ele.checked); });
     });
-    
+
     return generateOptionBase(title, `
 <div>
   <input id="ttc-opt-${option}" value="${settings[option] ? "on" : "off"}" type="checkbox"${settings[option] ? " checked" : ""}>
   <label for="ttc-opt-${option}"></label>
 </div>`, floatLeft ? { floatLeft: true } : {});
   };
-  
-  const generateTxtbox = function(title, option, cfg){
-    prepareOptionEvent(option, function(ele){
-      ele.addEventListener("input", debounce(function(){ updateOption(option, ele.value); }, cfg.wait));
+
+
+
+  const generateTxtbox = function (title, option, cfg) {
+    prepareOptionEvent(option, function (ele) {
+      ele.addEventListener("input", debounce(function () { updateOption(option, ele.value); }, cfg.wait));
     });
-    
+
     return generateOptionBase(title, `<input id="ttc-opt-${option}" type="text" value="${settings[option]}" placeholder="${cfg.placeholder}">`);
   };
-  
-  const generateSelect = function(title, option, cfg){
-    prepareOptionEvent(option, function(ele){
-      ele.addEventListener("input", function(){ updateOption(option, ele.value); });
+
+  const generateSelect = function (title, option, cfg) {
+    prepareOptionEvent(option, function (ele) {
+      ele.addEventListener("input", function () { updateOption(option, ele.value); });
     });
-    
+
     const initialOption = settings[option];
-    const optionElements = Object.keys(cfg).map(function(key){
+    const optionElements = Object.keys(cfg).map(function (key) {
       return `<option value="${key}"${key == initialOption ? " selected" : ""}>${cfg[key]}</option>`;
     });
-    
+
     return generateOptionBase(title, `<select id="ttc-opt-${option}">${optionElements}</select>`);
   };
-  
-  const generateSlider = function(title, option, cfg){
-    prepareOptionEvent(option, function(ele) {
+
+  const generateSlider = function (title, option, cfg) {
+    prepareOptionEvent(option, function (ele) {
       const regenerate = debounce(onSettingsUpdated, cfg.wait);
-  
+
       function setSliderValue(value) {
         settings[option] = value;
         document.getElementById("ttc-optval-" + option).value = value + cfg.text;
         regenerate();
       }
-  
-      ele.addEventListener("input", function() {
+
+      ele.addEventListener("input", function () {
         setSliderValue(ele.value, parseInt(ele.value, 10));
       });
-  
+
       if (cfg.editable) {
         ele.nextElementSibling.classList.add("editable");
-        ele.nextElementSibling.addEventListener("click", function() {
+        ele.nextElementSibling.addEventListener("click", function () {
           let customValue = prompt("Set custom value:", settings[option]);
           if (customValue === null) {
             return;
           }
-      
+
           customValue = customValue.trim();
-      
+
           if (customValue.endsWith(cfg.text)) {
             customValue = customValue.slice(0, -cfg.text.length).trim();
           }
-      
+
           if (/^\d+$/.test(customValue) === false) {
             alert("Invalid value.");
             return;
           }
-      
+
           setSliderValue(parseInt(customValue, 10));
           ele.value = customValue;
         });
       }
     });
-    
+
     return generateOptionBase(title, `
   <input id="ttc-opt-${option}" type="range" min="${cfg.min}" max="${cfg.max}" step="${cfg.step}" value="${settings[option]}">
   <output id="ttc-optval-${option}" for="ttc-opt-${option}" style="min-width:${cfg.width}px;">${settings[option]}${cfg.text}</option>
 `, { itemClasses: "ttc-setting-small-margin" });
   };
-  
+
   // Generate modal
-  
+
   const modal = document.createElement("div");
-  modal.id = "chylex-ttc-settings-modal";
+  modal.id = "twt-ttc-settings-modal";
   modal.innerHTML = `
-<div id="chylex-ttc-settings-modal-header">
+<div id="twt-ttc-settings-modal-header">
   <input id="ttc-opt-global" value="${settings.globalSwitch ? "on" : "off"}" type="checkbox"${settings.globalSwitch ? " checked" : ""}>
   <h2>Transparent Twitch Chat</h2>
+  <button id="twt-ttc-settings-modal-close" title="Close" aria-label="Close">✕</button>
 </div>
 
 <div class="ttc-flex-container">
-  <div style="flex: 0 0 25%">
+  <div style="flex: 0 0 24%">
     <p>General</p>
     ${generateSlider("Chat Width", "chatWidth", { min: 250, max: 800, step: 25, wait: 500, width: 48, text: "px", editable: true })}
     ${generateTxtbox("Chat Filters", "chatFilters", { wait: 500, placeholder: "Example: kappa, *abc*" })}
     ${generateSelect("Player Position", "playerPosition", {
-      "#opposite-chat": "Opposite of Chat",
-      "top left":       "Top Left",
-      "top center":     "Top Center",
-      "top right":      "Top Right",
-      "center left":    "Center Left",
-      "center center":  "Center",
-      "center right":   "Center Right",
-      "bottom left":    "Bottom Left",
-      "bottom center":  "Bottom Center",
-      "bottom right":   "Bottom Right"
-    })}
+    "#opposite-chat": "Opposite of Chat",
+    "top left": "Top Left",
+    "top center": "Top Center",
+    "top right": "Top Right",
+    "center left": "Center Left",
+    "center center": "Center",
+    "center right": "Center Right",
+    "bottom left": "Bottom Left",
+    "bottom center": "Bottom Center",
+    "bottom right": "Bottom Right"
+  })}
     ${generateToggle("Hide Timestamps", "hideTimestamps", true)}
     ${generateToggle("Gray Theme", "grayTheme")}
   </div>
@@ -509,15 +531,19 @@ function createSettingsModal(){
     ${generateToggle("Transparent Chat", "transparentChat")}
     ${generateToggle("Smooth Text Shadow", "smoothTextShadow")}
     ${generateToggle("Chat on Left Side", "chatLeftSide")}
+    ${generateToggle("Hide Chat Border", "hideChatBorder")}
+    ${generateToggle("Keep Transparent on Hover", "keepTransparentOnHover")}
     ${generateSlider("Background Opacity", "backgroundOpacity", { min: 0, max: 100, step: 5, wait: 100, width: 42, text: "%" })}
   </div>
 
-  <div style="flex: 0 0 16%">
+  <div style="flex: 0 0 19%">
     <p>Elements</p>
     ${generateToggle("Hide Chat Header", "hideHeader")}
     ${generateToggle("Hide Chat Input", "hideChatInput")}
     ${generateToggle("Hide Pinned Cheer", "hidePinnedCheer")}
     ${generateToggle("Hide Whispers", "hideConversations")}
+    ${generateToggle("Toggle Chat Shortcut", "toggleChatShortcut")}
+    ${generateTxtbox("Chat Shortcut Key", "toggleChatKey", { wait: 200, placeholder: "e.g. c or alt+c" })}
   </div>
 
   <div style="flex: 0 0 19%">
@@ -528,7 +554,7 @@ function createSettingsModal(){
     ${generateToggle("Hide VIP Badge", "hideBadgeVIP")}
   </div>
 
-  <div style="flex: 0 0 22%">
+  <div style="flex: 0 0 20%">
     <p style="visibility: hidden">Badges</p>
     ${generateToggle("Hide Sub Gift Badge", "hideBadgeSubGift")}
     ${generateToggle("Hide Bit Cheer Badge", "hideBadgeBitCheer")}
@@ -537,60 +563,75 @@ function createSettingsModal(){
   </div>
 </div>
 `;
-  
-  document.body.appendChild(modal);
-  
-  document.getElementById("ttc-opt-global").addEventListener("click", function(e){
+
+  const parent = document.fullscreenElement || document.webkitFullscreenElement || document.mozFullScreenElement || document.msFullscreenElement || document.body;
+  parent.appendChild(modal);
+
+  const closeBtn = document.getElementById("twt-ttc-settings-modal-close");
+  if (closeBtn) {
+    closeBtn.addEventListener("click", function () {
+      tryRemoveElement(modal);
+    });
+  }
+
+  document.getElementById("ttc-opt-global").addEventListener("click", function (e) {
     settings.globalSwitch = e.currentTarget.checked;
     onSettingsUpdated();
   });
-  
-  modal.addEventListener("click", function(e){
+
+  modal.addEventListener("click", function (e) {
     e.stopPropagation();
   });
 }
 
-function insertSettingsButton(){
+function toggleSettingsModal() {
+  const modal = document.getElementById("twt-ttc-settings-modal");
+  if (modal) {
+    tryRemoveElement(modal);
+  } else {
+    createSettingsModal();
+  }
+}
+
+function insertSettingsButton() {
   const container = document.querySelector("[data-test-selector='chat-room-component-layout'] > div, .video-chat");
-  
-  if (!container){
+
+  if (!container) {
     return false;
   }
-  
-  container.classList.add("chylex-ttc-chat-container");
-  
-  tryRemoveElement(document.getElementById("chylex-ttc-settings-btn"));
-  tryRemoveElement(document.getElementById("chylex-ttc-settings-modal"));
-  
+
+  container.classList.add("twt-ttc-chat-container");
+
+  tryRemoveElement(document.getElementById("twt-ttc-settings-btn"));
+  tryRemoveElement(document.getElementById("twt-ttc-settings-modal"));
+
   const button = document.createElement("div");
-  button.id = "chylex-ttc-settings-btn";
+  button.id = "twt-ttc-settings-btn";
   button.innerHTML = '<svg viewBox="0 0 15 15"><path d="M8.463,0.062c-0.639,-0.083 -1.287,-0.083 -1.926,0l-0.251,1.333c-0.802,0.159 -1.565,0.475 -2.244,0.929l-1.12,-0.765c-0.511,0.394 -0.969,0.852 -1.363,1.363l0.765,1.12c-0.454,0.679 -0.77,1.442 -0.929,2.244l-1.333,0.251c-0.083,0.639 -0.083,1.287 0,1.926l1.333,0.251c0.159,0.802 0.475,1.565 0.929,2.244l-0.765,1.12c0.394,0.511 0.852,0.969 1.363,1.363l1.12,-0.765c0.679,0.454 1.442,0.77 2.244,0.929l0.251,1.333c0.639,0.083 1.287,0.083 1.926,0l0.251,-1.333c0.802,-0.159 1.565,-0.475 2.244,-0.929l1.12,0.765c0.511,-0.394 0.969,-0.852 1.363,-1.363l-0.765,-1.12c0.454,-0.679 0.77,-1.442 0.929,-2.244l1.333,-0.251c0.083,-0.639 0.083,-1.287 0,-1.926l-1.333,-0.251c-0.159,-0.802 -0.475,-1.565 -0.929,-2.244l0.765,-1.12c-0.394,-0.511 -0.852,-0.969 -1.363,-1.363l-1.12,0.765c-0.679,-0.454 -1.442,-0.77 -2.244,-0.929l-0.251,-1.333Zm-0.963,2.731c2.598,0 4.707,2.109 4.707,4.707c0,2.598 -2.109,4.707 -4.707,4.707c-2.598,0 -4.707,-2.109 -4.707,-4.707c0,-2.598 2.109,-4.707 4.707,-4.707Z"/><rect x="6.75" y="6" width="1.5" height="5.25"/><rect x="4.89" y="4.5" width="5.221" height="1.5"/></svg>';
   container.appendChild(button);
-  
-  button.addEventListener("click", function(e){
-    if (!document.getElementById("chylex-ttc-settings-modal")){
-      createSettingsModal();
-      e.stopPropagation();
-    }
+
+  button.addEventListener("click", function (e) {
+    toggleSettingsModal();
+    e.stopPropagation();
   });
-  
-  if (isFirefox && container.classList.contains("video-chat")){
+
+  if (isFirefox && container.classList.contains("video-chat")) {
     const wrapper = document.querySelector(".video-chat__message-list-wrapper");
     const unsynced = "video-chat__message-list-wrapper--unsynced";
-    
-    wrapper.addEventListener("wheel", function(e){
-      if (e.deltaY < 0){
+
+    wrapper.addEventListener("wheel", function (e) {
+      if (e.deltaY < 0) {
         wrapper.classList.add(unsynced);
       }
     });
-    
-    wrapper.addEventListener("keydown", function(e){
-      if (e.keyCode === 38 || e.keyCode === 33){ // up arrow || page up
+
+    wrapper.addEventListener("keydown", function (e) {
+      if (e.keyCode === 38 || e.keyCode === 33) { // up arrow || page up
         wrapper.classList.add(unsynced);
       }
     });
   }
-  
+
   return true;
 }
 
@@ -599,26 +640,26 @@ function insertSettingsButton(){
 var prevAddress = null;
 var rehookInterval = null;
 
-window.setInterval(function(){
-  if (location.href != prevAddress){
+window.setInterval(function () {
+  if (location.href != prevAddress) {
     prevAddress = location.href;
-    
+
     var hooks = [
       refreshChatFilters,
       setupClassHelpers,
       insertSettingsButton
     ];
-    
+
     window.clearInterval(rehookInterval);
-    
-    rehookInterval = window.setInterval(function(){
-      for(let index = hooks.length - 1; index >= 0; index--){
-        if (hooks[index]()){
+
+    rehookInterval = window.setInterval(function () {
+      for (let index = hooks.length - 1; index >= 0; index--) {
+        if (hooks[index]()) {
           hooks.splice(index, 1);
         }
       }
-      
-      if (hooks.length === 0){
+
+      if (hooks.length === 0) {
         window.clearInterval(rehookInterval);
         rehookInterval = null;
       }
@@ -626,9 +667,43 @@ window.setInterval(function(){
   }
 }, 1000);
 
-document.body.addEventListener("click", function(){
-  tryRemoveElement(document.getElementById("chylex-ttc-settings-modal"));
+document.addEventListener("click", function () {
+  tryRemoveElement(document.getElementById("twt-ttc-settings-modal"));
 });
+
+function matchesShortcut(e, str) {
+  if (!str) return false;
+  const current = `${e.ctrlKey ? "ctrl+" : ""}${e.altKey ? "alt+" : ""}${e.shiftKey ? "shift+" : ""}${e.key.toLowerCase()}`;
+  return current === str.toLowerCase().replace(/\s+/g, "");
+}
+
+document.addEventListener("keydown", function (e) {
+  if (e.key === "Escape" || e.keyCode === 27) {
+    tryRemoveElement(document.getElementById("twt-ttc-settings-modal"));
+    return;
+  }
+
+  if (settings.globalSwitch && settings.toggleChatShortcut && matchesShortcut(e, settings.toggleChatKey)) {
+    if (!["INPUT", "TEXTAREA"].includes(e.target.tagName) && !e.target.isContentEditable) {
+      const btn = document.querySelector('[data-a-target="right-column__toggle-collapse-btn"]');
+      if (btn) btn.click();
+    }
+  }
+}, true);
+
+function registerMenuCommand() {
+  const callback = function () {
+    toggleSettingsModal();
+  };
+
+  if (typeof GM_registerMenuCommand !== "undefined") {
+    GM_registerMenuCommand("Settings", callback);
+  } else if (typeof GM !== "undefined" && typeof GM.registerMenuCommand === "function") {
+    GM.registerMenuCommand("Settings", callback);
+  }
+}
+
+registerMenuCommand();
 
 setupFullscreenHelper();
 
