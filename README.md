@@ -45,6 +45,10 @@ In order to change settings, click **Settings** from your userscript manager men
 
 ![](https://repo.chylex.com/transparent-twitch-chat-settings.png?v=1)
 
+### Release Notes
+
+Visit the [Release notes](https://github.com/ElectricArdvark/Transparent-twitch-chat/wiki/Release-Notes) page to see a list of changes across all updates.
+
 ### Issues & Feedback
 
 [Open a new issue](https://github.com/ElectricArdvark/Transparent-Twitch-Chat/issues) if you found a bug or have a suggestion for improvements and new features. When reporting a bug, please include the exact name and version of your browser, and a list of all addons and userscripts you have installed.
