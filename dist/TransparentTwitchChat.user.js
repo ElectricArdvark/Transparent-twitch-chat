@@ -4,7 +4,7 @@
 // @version      1.6.0
 // @homepageURL  https://github.com/ElectricArdvark/Transparent-twitch-chat
 // @supportURL   https://github.com/ElectricArdvark/Transparent-twitch-chat/issues
-// @downloadURL  https://github.com/ElectricArdvark/Transparent-twitch-chat/raw/master/dist/TransparentTwitchChat.user.js
+// @downloadURL  https://github.com/ElectricArdvark/Transparent-twitch-chat/raw/main/dist/TransparentTwitchChat.user.js
 // @include      https://www.twitch.tv/*
 // @run-at       document-end
 // @grant        GM_getValue
